@@ -26,7 +26,6 @@ for playlist in playlists:
     #     continue
 
 
-
     # Get playlist members
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute("SELECT * FROM `playlists_members` WHERE `playlist_id` = ? and (status is NULL or status != 'ok')",
@@ -44,13 +43,13 @@ for playlist in playlists:
 
         # Check YouTube video exist in db
         with conn.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT * FROM `videos` WHERE id = ? AND `place` = 'yotube'",(video['video_id'],))
+            cursor.execute("SELECT * FROM `videos` WHERE id = ? AND `place` = 'youtube'",(video['video_id'],))
             if cursor.rowcount == 1:
                 video_in_db = cursor.fetchall()[0]
             elif cursor.rowcount == 0:
                 video_in_db = []
             else:
-                log.error('Foud {} rows in db for yotube video {}'.format(cursor.rowcount, video['video_id']))
+                log.error('Foud {} rows in db for youtube video {}'.format(cursor.rowcount, video['video_id']))
                 exit(-1)
 
 
@@ -67,10 +66,18 @@ for playlist in playlists:
                                    (video['video_id'],))
                     conn.commit()
                     log.debug('Changed {} rows'.format(cursor.rowcount))
+
+                # log.info('Update filename')
+                # with conn.cursor(dictionary=True) as cursor:
+                #     cursor.execute("UPDATE `videos` SET `main_filename`=? "
+                #                    "WHERE `id` = ? AND `place` = 'youtube'",
+                #                    (Path(files['.mp4']).name, video['video_id']))
+                #     conn.commit()
+                #     log.debug('Changed {} rows'.format(cursor.rowcount))
                 continue
 
         # Download video
-        y_video = download_yotube_video(video['video_id'], log)
+        y_video = download_youtube_video(video['video_id'], log)
         if 'error' in y_video:
             log.error(f"Error on download video, skip: {video['video_id']}")
             log.debug('Mark as error')
@@ -81,24 +88,33 @@ for playlist in playlists:
                 log.debug('Changed {} rows'.format(cursor.rowcount))
             continue
 
+        # Get channel
+        status, dlp_files = find_dlp_files(video['video_id'], log)
+        with open(dlp_files['.info.json']) as f:
+            data = json.load(f)
+            channel_id = data['channel_id']
 
         if video_in_db:
-            log.info('Update re-downlodad video info in db')
+            log.info('Update re-download video info in db')
             with conn.cursor(dictionary=True) as cursor:
-                cursor.execute("UPDATE `videos` SET `title`=?, `description`=?, `video_md5`=?, `lang`=?, `license`=?,"
-                               "`storage`=?, ctime=current_timestamp() WHERE `id` = ? AND `place` = 'yotube'",
-                               (y_video['title'], y_video['description'], y_video['video_md5'],y_video['language'],
-                                y_video['license'] if 'license' in y_video else None, config.storage, video['video_id']))
+                cursor.execute("UPDATE `videos` SET `channel`=?, `title`=?, `description`=?, `main_filename`=?, "
+                               "`video_md5`=?, `lang`=?, `license`=?, `storage`=?, ctime=current_timestamp() "
+                               "WHERE `id` = ? AND `place` = 'youtube'", (channel_id, y_video['title'],
+                                y_video['description'], Path(dlp_files['.mp4']).name, y_video['video_md5'],
+                                y_video['language'], y_video['license'] if 'license' in y_video else None,
+                                config.storage, video['video_id']))
                 conn.commit()
                 log.debug('Changed {} rows'.format(cursor.rowcount))
         else:
             log.info("Add new YouTube video to db {}".format(video['video_id']))
             oyid = take_new_oyid(conn, log)
             with conn.cursor(dictionary=True) as cursor:
-                cursor.execute("INSERT INTO `videos` (`id`, `oyid`, `place`, `title`, `description`, `video_md5`, `lang`,"
-                           "`license`, `storage`, `ctime`) VALUES (?, ?, 'yotube', ?, ?, ?, ?, ?, ?, current_timestamp())",
-                           (y_video['id'], oyid, y_video['title'],  y_video['description'], y_video['video_md5'],
-                            y_video['language'], y_video['license'] if 'license' in y_video else None, config.storage))
+                cursor.execute("INSERT INTO `videos` (`id`, `oyid`, `place`, `channel`, `title`, `description`, "
+                               "`main_filename`,`video_md5`, `lang`, `license`, `storage`, `ctime`) "
+                               "VALUES (?, ?, 'youtube',?, ?, ?, ?, ?, ?, ?, ?, current_timestamp())",
+                           (y_video['id'], oyid, channel_id, y_video['title'],  y_video['description'],
+                            Path(dlp_files['.mp4']).name, y_video['video_md5'], y_video['language'],
+                            y_video['license'] if 'license' in y_video else None, config.storage))
 
             conn.commit()
     # exit(0)

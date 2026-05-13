@@ -25,8 +25,8 @@
 # playlists ={}
 # for p in db_playlists:
 #     if p['id'] not in playlists:
-#         if p['place'] != 'yotube' and p['place'] != None:
-#             log.error('Video not from yotube')
+#         if p['place'] != 'youtube' and p['place'] != None:
+#             log.error('Video not from youtube')
 #             log.error(p)
 #             exit(-1)
 #         playlists[p['id']] = {'title': p['title'],

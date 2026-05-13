@@ -1,4 +1,4 @@
-yotube_dir = '/disk-2025/yotube'
+youtube_dir = '/disk-2025/youtube'
 log_dir = '/disk-2025/logs'
 
 mariadb_connect = {

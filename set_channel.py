@@ -26,9 +26,9 @@ conn = mariadb.connect(** config.mariadb_connect)
 #             log.error(f"Change {cursor.rowcount} rows")
 #             exit(-1)
 
-# Get yotube video list
+# Get youtube video list
 with conn.cursor(dictionary=True) as cursor:
-    cursor.execute("SELECT id FROM `videos` WHERE `place` = 'yotube' and channel is null")
+    cursor.execute("SELECT id FROM `videos` WHERE `place` = 'youtube' and channel is null")
     videos = cursor.fetchall()
 
 c = 0
@@ -48,7 +48,7 @@ for video in videos:
     with open(dlp_files['.info.json']) as f:
         data = json.load(f)
         with conn.cursor(dictionary=True) as cursor:
-            cursor.execute("UPDATE `videos` SET `channel`= ? WHERE id = ? AND place = 'yotube'",
+            cursor.execute("UPDATE `videos` SET `channel`= ? WHERE id = ? AND place = 'youtube'",
                            (data['channel_id'], vid))
 
             conn.commit()

@@ -3,6 +3,8 @@ from collections import deque
 import asyncio
 from telegram import Bot
 from telegram.constants import ParseMode
+from telegram.request import HTTPXRequest
+from pprint import pprint
 import config
 
 def truncate_text_utf8(l_text: str, max_bytes: int) -> str:
@@ -30,7 +32,13 @@ def tail_log_for_telegram(filename, n=10):
 
 
 async def send_async(text):
-    bot = Bot(token=config.telegram_api_key)
+    request = HTTPXRequest()
+
+    if hasattr(config, 'telegram_proxy'):
+        request = HTTPXRequest(proxy=config.telegram_proxy)
+
+    bot = Bot(token=config.telegram_api_key,request=request)
+
     await bot.send_message(chat_id=config.telegram_chat_id, text=text,
                            disable_web_page_preview=True,
                            parse_mode = ParseMode.HTML)

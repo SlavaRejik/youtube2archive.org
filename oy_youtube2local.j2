@@ -1,0 +1,62 @@
+{%- macro remove_mp4(filename) -%}
+  {%- if filename is string and filename.endswith('.mp4') -%}
+    {{ filename[:-4] }}
+  {%- else -%}
+    {{ filename }}
+  {%- endif -%}
+{%- endmacro -%}
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head><title>youtube2archive</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+</head><body>
+<table border="0" align="center">
+<tr><td valign="top" width="800">
+<h1>Список копий видео с yotube каналов открытой йоги на archive.org.</h1>
+<br>
+<p>Обновлен: {{ TODAY }}</p>
+<br>
+<a href="https://archive.org/download/808-2025-10-20-14-40-yoga-how-to-find-course-videos-on-archive.org-archive.org/808-2025-10-20-14-40-Yoga-how-to-find-course-videos-on-archive.org-%D0%BA%D0%B0%D0%BA-%D0%BD%D0%B0%D0%B9%D1%82%D0%B8-%D0%B2%D0%B8%D0%B4%D0%B5%D0%BE-%D0%BA%D1%83%D1%80%D1%81%D0%B0-%D0%BD%D0%B0-archive.org.mp4">Видео инструкция</a>
+<br>
+<video width="100%" height="auto" controls src="https://archive.org/download/808-2025-10-20-14-40-yoga-how-to-find-course-videos-on-archive.org-archive.org/808-2025-10-20-14-40-Yoga-how-to-find-course-videos-on-archive.org-%D0%BA%D0%B0%D0%BA-%D0%BD%D0%B0%D0%B9%D1%82%D0%B8-%D0%B2%D0%B8%D0%B4%D0%B5%D0%BE-%D0%BA%D1%83%D1%80%D1%81%D0%B0-%D0%BD%D0%B0-archive.org.mp4"></video>
+<br><br>
+<p>Копия видео с каналов:<br>
+<br>
+{% for b in TREE %}
+<a target="_blank" href="{{ TREE[b]['url'] }}">{{ TREE[b]['url'] }}</a><br>
+{%- endfor %}
+
+<p>Так же доступен в гугл-таблице <a target="_blank" href="https://docs.google.com/spreadsheets/d/1Th0Ml89VNU3I5fxPNJL-cwuzgpGmcEDKdQqhBWN9gdM/edit?usp=sharing">https://docs.google.com/spreadsheets/d/1Th0Ml89VNU3I5fxPNJL-cwuzgpGmcEDKdQqhBWN9gdM/edit?usp=sharing</a></p>
+<br>
+<p>Скрипты python, которыми был сделан перенос в гитхабе <a target="_blank" href=" https://github.com/SlavaRejik/yotube2archive.org"> https://github.com/SlavaRejik/yotube2archive.org</a>
+<br>
+
+{% for b in TREE | sort %}
+<h1 style='background-color: yellow;'><a target="_blank" href="{{ TREE[b]['url'] }}">{{ TREE[b]['url'] }}</a><br>{{TREE[b]['title']}}</h1>
+  {% for p in TREE[b]['playlists'] | sort %}
+<h2 style='background-color: #f5f5f5;'><a target="_blank" href="https://www.youtube.com/playlist?list={{ p }}">{{ TREE[b]['playlists'][p]['title'] }}</a></h2>
+{%- for m in TREE[b]['playlists'][p]['members'] | sort -%}
+{%- set serial = '%06d' % TREE[b]['playlists'][p]['members'][m]['serial'] -%}
+{%- set main_filename = TREE[b]['playlists'][p]['members'][m]['main_filename'] | replace('#', '%23') -%}
+{%- set oyid=TREE[b]['playlists'][p]['members'][m]['oyid'] -%}
+<b>{{ serial[:-3] ~ '-' ~ serial[-3:] }}</b><br>
+{{ TREE[b]['playlists'][p]['members'][m]['title'] }}<br>
+<a target="_blank" href="https://youtu.be/{{ TREE[b]['playlists'][p]['members'][m]['id'] }}">youtu.be/{{ TREE[b]['playlists'][p]['members'][m]['id'] }}</a><br>
+<a target="_blank" href="https://archive.org/details/{{ oyid }}">archive.org/details/{{ TREE[b]['playlists'][p]['members'][m]['oyid'] }}</a><br>
+{% if TREE[b]['playlists'][p]['members'][m]['related'] is defined %}
+Related: 
+{% for rid in TREE[b]['playlists'][p]['members'][m]['related'] %}
+<a target="_blank" href="https://archive.org/details/{{ rid }}">archive.org/details/{{ rid }}</a>
+{% endfor -%}
+<br>
+{% endif -%}
+Download: <a target="_blank" href="https://archive.org/download/{{ oyid }}/{{ main_filename }}">mp4</a>
+<a target="_blank" href="https://archive.org/download/{{ oyid }}/{{remove_mp4(main_filename)}}.mp3">mp3</a>
+<a target="_blank" href="https://archive.org/download/{{ oyid }}/{{ oyid }}_archive.torrent">Torrent</a><br>
+<br>
+{%- endfor -%}
+{%- endfor -%}
+{%- endfor -%}
+
+</td></tr></table></body></html>
