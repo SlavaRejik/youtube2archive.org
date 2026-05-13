@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # from tqdm import tqdm
 import mariadb
+from datetime import datetime
 from pprint import pprint
 from pathlib import Path
 import time
@@ -28,6 +29,19 @@ def psize(l_num):
 def mbit(l_num):
     return f'{l_num*8/(1024**2):.2f}Mbit'
 
+def truncate_utf8(text, max_bytes=252):
+    encoded = text.encode('utf-8')
+    if len(encoded) <= max_bytes:
+        return text
+    left, right = 0, len(text)
+    while left < right:
+        mid = (left + right + 1) // 2
+        if len(text[:mid].encode('utf-8')) <= max_bytes:
+            left = mid
+        else:
+            right = mid - 1
+    return f'{text[:left]}...'
+
 ## Get files list
 def find_all_files_pathlib(l_dir, l_log):
     ret=[]
@@ -51,7 +65,8 @@ def find_all_files_pathlib(l_dir, l_log):
 def video_attributes(l_pfile, l_oyid, l_youtube_file_name):
     l_rel_path = str(pfile.relative_to(prefix))
     l_md5 = md5_checksum(l_pfile)
-    l_title = f'old.openyogaclass.com/{l_rel_path}'
+    l_title = truncate_utf8(f'old.openyogaclass.com/{l_rel_path}')
+
     l_description = f'File {rel_path}\nfrom old.openyogaclass.com'
 
     # Set md
@@ -150,7 +165,6 @@ for pfile in files_on_disk_sorted:
         log.debug(f'{index}/{len(files_on_disk)} {psize(done_size)}/{psize(sum_size)} {remain_txt}')
 
     done_size += pfile.stat().st_size
-
 
     if len(rel_path)>255:
         log.error(f'Path too long: {len(rel_path)} {rel_path}')
@@ -281,15 +295,23 @@ if need_another_round:
 
 ## Generate html
 ####################################
+
+
+now = datetime.now()
+today = now.strftime("%Y%m%d")
+count=0
+
 html = ('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">'
         '<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8"></HEAD><body>')
 
 for pfile in files_on_disk:
+    count += 1
     rel_dir = str(pfile.parent.relative_to(prefix))
     rel_path = str(pfile.relative_to(prefix))
     file_name = pfile.name
-    html += f'<p><b>{rel_dir}/{file_name}</b><br>'
-    html += f'<a target="_blank" href="https://old.openyogaclass.com/{rel_path}">old.openyogaclass.com/{rel_path}</a><br><br>'
+    html += f'<p>{today}-{count:04d}<br>'
+    html += f'<b>{rel_dir}/{file_name}</b><br>'
+    html += f'<a target="_blank" href="https://old.openyogaclass.com/{rel_path}">old.openyogaclass.com/{rel_path}</a><br>'
     html += f'<a target="_blank" href="https://archive.org/details/{video_in_db[rel_path]["oyid"]}">archive.org/details/{video_in_db[rel_path]["oyid"]}</a> '
     # html+=f'<p>{rel_dir}/<a target="_blank" href="https://archive.org/details/{video_in_db[rel_path]["oyid"]}"><b>{file_name}</b></a>'
     html+=f'(<a target="_blank" href="https://archive.org/download/{video_in_db[rel_path]["oyid"]}/{file_name}">Download</a>) '

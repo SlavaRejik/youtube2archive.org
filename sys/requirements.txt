@@ -1,6 +1,3 @@
-python-whois
-google-api-python-client
-python-rest-client
 audioop-lts>=0.2.2
 anyio>=4.10.0
 certifi>=2025.8.3
@@ -29,3 +26,6 @@ urllib3>=2.5.0
 webvtt-py>=0.5.1
 yt-dlp>=2025.9.5
 selenium>=4.41.0
+Jinja2>=3.1.6
+weasyprint>=68.1
+

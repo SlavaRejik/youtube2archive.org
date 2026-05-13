@@ -33,7 +33,7 @@ options = webdriver.ChromeOptions()
 
 # For detach
 # options.add_experimental_option("detach", True)
-options.add_argument(r"--user-data-dir=data/chrome-yotube")
+options.add_argument(r"--user-data-dir=data/chrome-youtube")
 options.add_argument(r"--profile-directory=Default")
 options.add_argument('--proxy-server=socks5://127.0.0.1:8888')
 
@@ -47,11 +47,11 @@ wait = WebDriverWait(driver, 10)
 # Check channel id
 driver.get(f'https://studio.youtube.com/')
 channel = wait.until(EC.element_to_be_clickable((By.ID, 'menu-item-0')))
-log.debug(f'YOTUBE: Channel url: {channel.get_attribute("href")}')
+log.debug(f'Youtube: Channel url: {channel.get_attribute("href")}')
 
 if channel.get_attribute("href").startswith(f'https://studio.youtube.com/channel/{config.channel_id}'):
     channel_ok = True
-    log.info("YOTUBE: Channel OK")
+    log.info("Youtube: Channel OK")
 else:
     log.error("Change channel an run again")
     exit(-1)

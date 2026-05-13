@@ -1,4 +1,4 @@
-# yotube2archive.org
+# youtube2archive.org
 
 1. Install libs from sys/requirements.txt
 2. Create maria/mysql db by sys/oyvideo.sql

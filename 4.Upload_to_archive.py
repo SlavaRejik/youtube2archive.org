@@ -22,10 +22,13 @@ with conn.cursor(dictionary=True) as cursor:
     playlists=cursor.fetchall()
 
 #
-# ltodo = [
+# l_todo = [
 #     'PL111H',
 #         ]
-
+l_ignore = ['PLUvHw72mPih7xpIOrTao2gpG0BKoFr2ni', 'PLUvHw72mPih4R8iIgzTSI52xza4r6wEAE',
+            'PLUvHw72mPih4kzqgWK0uMifpPVJKMQcQZ', 'PLUvHw72mPih4_gkSdwFGuTeAdDt9gOUje',
+            'PLUvHw72mPih6-xl4Pm0Nsf2sE0fwFbbdZ', 'PLUvHw72mPih4SN6OJdGu_85QMdtqzmVY3',
+            ]
 
 # Cycle by playlists
 cur_playlist=0
@@ -36,6 +39,8 @@ for playlist in playlists:
 
     # if playlist['id'] not in ltodo:
     #    continue
+    if playlist['id']  in l_ignore:
+       continue
 
     # Get playlist members
     with conn.cursor(dictionary=True) as cursor:
@@ -86,16 +91,16 @@ for playlist in playlists:
 
         playlist_status = 'Not checked'
 
-        # Read yotube video
+        # Read youtube video
         with conn.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT * FROM `videos` WHERE oyid = ? AND `place` = 'yotube'",(video['oyid'],))
+            cursor.execute("SELECT * FROM `videos` WHERE oyid = ? AND `place` = 'youtube'",(video['oyid'],))
             if cursor.rowcount == 1:
                 y_video = cursor.fetchall()[0]
             else:
-                log.error('Foud {} rows in db for yotube video {}'.format(cursor.rowcount, video['oyid']))
+                log.error('Foud {} rows in db for youtube video {}'.format(cursor.rowcount, video['oyid']))
                 exit(-1)
 
-        # Find yotube playlists for video and make subjects
+        # Find youtube playlists for video and make subjects
         with conn.cursor(dictionary=True) as cursor:
             cursor.execute("SELECT p.`title`, m.`playlist_id` FROM `playlists_members` m "
                            "LEFT JOIN `playlists` p "
@@ -103,16 +108,17 @@ for playlist in playlists:
                            "WHERE `video_id` = ?  and p.channel_id = ? "
                            "GROUP BY p.title", (y_video['id'],config.channel_id))
             if cursor.rowcount < 1:
-                log.error('Foud {} playlist for yotube video {}'.format(cursor.rowcount, y_video['id']))
+                log.error('Foud {} playlist for youtube video {}'.format(cursor.rowcount, y_video['id']))
                 exit(-1)
 
-            log.debug('Yotube id: {}'.format(y_video['id']))
+            log.debug('Youtube id: {}'.format(y_video['id']))
 
             # Make subjects
             subjects = ['OpenYoga', 'Yoga']
 
             for ret in cursor.fetchall():
-                subjects.insert(0,ret['title'])
+                if ret['title'] != 'Videos without playlist':
+                    subjects.insert(0,ret['title'])
             # log.debug(subjects)
 
         # Set md
@@ -127,18 +133,21 @@ for playlist in playlists:
 
         # Files on disk
         files_on_disk = {}
-        status, dpl_files = find_dlp_files(y_video['id'],log)
+        status, dlp_files = find_dlp_files(y_video['id'],log)
         if status != 0:
             log.error('Not zero status({}) from files_to_upload for id "{}"'.format(status, y_video['id']))
             exit(-1)
-        for f in dpl_files:
+        for f in dlp_files:
             if f not in ['.info.json', '.description']:
-                files_on_disk[dpl_files[f]] = md5_checksum(dpl_files[f])
+                files_on_disk[dlp_files[f]] = md5_checksum(dlp_files[f])
 
 
         ## Already in archive
         if ar_video.get('id'):
             item = internetarchive.get_item(ar_video['id'])
+            if item.item_metadata == {} or 'metadata' not in item.item_metadata:
+                log.info(f"No metadata, re-upload {ar_video['id']}")
+
 
             # Go to next if tasks
             if check_active_tasks(ar_video['id'],log, wait=False) !=0:
@@ -146,10 +155,10 @@ for playlist in playlists:
                 need_another_round = 1
                 continue
 
+
             # Get archive files
             ar_files={}
             for file in item.files:
-                # print(file)
                 if file['source'] == 'original' and not file['name'].endswith(('_files.xml', '_meta.sqlite',
                                                                                '_meta.xml', '__ia_thumb.jpg')):
                     ar_files[file['name']] = file['md5']
@@ -189,13 +198,14 @@ for playlist in playlists:
 
             # Upload files
             if len(files_to_upload):
-                log.info('Files to upload to {}'.format(ar_video['id']))
+                log.info('Files to re-upload to {}'.format(ar_video['id']))
                 log.debug(files_to_upload)
                 upload_files_to_archive(ar_video['id'],files_to_upload, {},log)
                 need_another_round = 1
                 changed_on_archive = True
 
             # Compare md
+            item = internetarchive.get_item(ar_video['id'])
             change_md = compare_md(item.item_metadata['metadata'], md)
 
             # Update md on archive
@@ -227,10 +237,10 @@ for playlist in playlists:
                         log.debug(' db  {}: "{}"'.format(format(k), ar_video[k]))
                         log.debug(' cur {}: "{}"'.format(format(k), md[v]))
 
-                if ar_video['video_md5'] != files_on_disk[dpl_files['.mp4']]:
+                if ar_video['video_md5'] != files_on_disk[dlp_files['.mp4']]:
                     changed_on_archive = True
                     log.debug(' db  md5: "{}"'.format(format(ar_video['video_md5'])))
-                    log.debug(' cur md5: "{}"'.format(format(files_on_disk[dpl_files['.mp4']])))
+                    log.debug(' cur md5: "{}"'.format(format(files_on_disk[dlp_files['.mp4']])))
 
                 # Mark checked if nothing changing
                 if not changed_on_archive:
@@ -247,11 +257,12 @@ for playlist in playlists:
                 log.info('Update video in db {}'.format(ar_video['id']))
                 with conn.cursor(dictionary=True) as cursor:
                     cursor.execute("UPDATE `videos` SET `oyid` = ?, `channel`= ?, `title` = ?, `description` = ?, "
-                                   "`video_md5` = ?, `lang` = ?, `license` = ?, `storage` = ?, `status` = 'downloaded'"
+                                   "`main_filename`=?, `video_md5` = ?, `lang` = ?, `license` = ?, `storage` = ?, "
+                                   "`status` = 'downloaded' "
                                    "WHERE `videos`.`id` = ? AND `videos`.`place` = 'archive'",
-                                   (y_video['oyid'], channel, md['title'], md['description'], files_on_disk[dpl_files['.mp4']],
-                                    md['language'], md['licenseurl'], config.storage,
-                                   ar_video['id']))
+                                   (y_video['oyid'], channel, md['title'], md['description'], Path(dlp_files['.mp4']).name,
+                                    files_on_disk[dlp_files['.mp4']], md['language'], md['licenseurl'], config.storage,
+                                    ar_video['id']))
                     conn.commit()
                     log.debug('Changed {} rows'.format(cursor.rowcount))
         else:
@@ -272,11 +283,11 @@ for playlist in playlists:
             log.info('Add new video to db {}'.format(new_oyid))
             with conn.cursor(dictionary=True) as cursor:
                 cursor.execute("INSERT INTO `videos`(`id`, `oyid`, `place`, `channel`, `title`, `description`, "
-                               "`video_md5`, `lang`, `license`, `storage`) "
-                               "VALUES (?, ?, 'archive', ?, ?, ?, ?, ?, ?, ?)",
+                               "`main_filename`, `video_md5`, `lang`, `license`, `storage`) "
+                               "VALUES (?, ?, 'archive', ?, ?, ?, ?, ?, ?, ?, ?)",
                                        (new_oyid, y_video['oyid'], channel, md['title'], md['description'],
-                                        files_on_disk[dpl_files['.mp4']], md['language'], md['licenseurl'],
-                                        config.storage))
+                                        Path(dlp_files['.mp4']).name, files_on_disk[dlp_files['.mp4']],
+                                        md['language'], md['licenseurl'], config.storage))
                 conn.commit()
 
 

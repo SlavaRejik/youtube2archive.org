@@ -8,12 +8,11 @@ from pprint import pprint
 log = create_logger('{}/{}.log'.format(config.log_dir, os.path.basename(__file__)))
 conn = mariadb.connect(** config.mariadb_connect)
 
-# Get all video list
+# Get all youtube videos
 with conn.cursor(dictionary=True) as cursor:
     cursor.execute("SELECT p.title,m.video_id,v.video_md5 FROM `playlists` p "
                    "LEFT JOIN playlists_members m on p.id = m.playlist_id "
-                   "LEFT JOIN videos v on m.video_id = v.id "
-                   " WHERE p.channel_id = 'UC6EuQtUtQpYKI8SBXnUy5og' and (v.storage != 'rejik-2026' OR v.storage is null)")
+                   "LEFT JOIN videos v on m.video_id = v.id")
     videos = cursor.fetchall()
     size = len(videos)
     log.info(f'Found {size} videos')

@@ -7,6 +7,7 @@ import glob
 from pydub import AudioSegment
 import logging
 import random
+import re
 import html
 import string
 import time
@@ -23,8 +24,12 @@ from datetime import datetime
 from collections import deque
 # import requests
 import config
-# from pprint import pprint
+from pprint import pprint
 
+# Sleep with progress
+def sleep_with_progress(l_sec):
+    for item in tqdm(range(1, l_sec+1), desc=f'Sleep for {l_sec} sec'):
+        sleep(1)
 
 # Get internetarchive username from ini
 def ia_user():
@@ -210,7 +215,7 @@ def compare_md(old_md, new_md):
     return change_md
 
 
-def upload_files_to_archive(l_oyid, l_files, l_md, l_log, sleep_time=20):
+def upload_files_to_archive(l_oyid, l_files, l_md, l_log, sleep_time=30, attempt=0):
 
     item = internetarchive.get_item(l_oyid)
     if item.item_metadata != {}:
@@ -228,18 +233,29 @@ def upload_files_to_archive(l_oyid, l_files, l_md, l_log, sleep_time=20):
         title = c_md['title']
         c_md['title']='title'
 
-    l_log.debug('Upload without description and title')
+    l_log.debug(f'Upload without description and title, attempt {attempt}')
     l_log.debug(c_md)
-    r1 = internetarchive.upload(identifier=l_oyid,
-                                files=l_files,
-                                verbose=True,
-                                verify=True,
-                                retries=10,
-                                retries_sleep=sleep_time,
-                                metadata=c_md)
+    try:
+        r1 = internetarchive.upload(identifier=l_oyid,
+                                    files=l_files,
+                                    verbose=True,
+                                    verify=True,
+                                    retries=10,
+                                    retries_sleep=sleep_time,
+                                    metadata=c_md)
+    except Exception as e:
+        if attempt > 2:
+            l_log.error(f"Couldn't upload after {attempt} attempts. Exit.")
+            raise e
+        l_log.debug(f'Upload failed with exception: {e}')
+        sleep_with_progress(900)
+        upload_files_to_archive(l_oyid, l_files, l_md, l_log, attempt=attempt+1)
+        return 0
+
 
     if not r1[0].ok:
         l_log.error('Can\'t upload without description video {}, code: {}. Exit.'.format(l_oyid, r1[0].status_code))
+        pprint(r1)
         return -1
 
     print('Wait item: ',end=' ', flush=True)
@@ -247,10 +263,11 @@ def upload_files_to_archive(l_oyid, l_files, l_md, l_log, sleep_time=20):
         print('.', end='', flush=True)
         sleep(10)
         item = internetarchive.get_item(l_oyid)
-        if item.item_metadata != {}:
+        if item.item_metadata != {} and 'metadata' in item.item_metadata:
             break
     print(' found.')
-    l_log.debug(item)
+    # l_log.debug(item)
+    # l_log.debug(item.item_metadata)
 
     changes = {}
     if description != '' :
@@ -264,6 +281,7 @@ def upload_files_to_archive(l_oyid, l_files, l_md, l_log, sleep_time=20):
         if not r.ok:
             l_log.error('Can\'t change metadata for {}, code: {}. Exit.'.format(l_oyid, r.status_code))
             exit(-1)
+
     return 0
 
 
@@ -297,10 +315,10 @@ def check_active_tasks(ar_id,l_log, wait=True, wait_time=60):
 
 # Convert id to path
 def path_by_id(l_id):
-    return '{}/{}/{}'.format(config.yotube_dir, l_id[0:2], l_id)
+    return '{}/{}/{}'.format(config.youtube_dir, l_id[0:2], l_id)
 
 # def path_by_id(l_id):
-#     return '{}/{}/{}/{}/{}'.format(config.yotube_dir, config.channel_id, l_id[0:2], l_id[2:4], l_id)
+#     return '{}/{}/{}/{}/{}'.format(config.youtube_dir, config.channel_id, l_id[0:2], l_id[2:4], l_id)
 
 
 # Run cmd and return {code: x, stdout: x, stderr: x}
@@ -318,27 +336,27 @@ def run_cmd(l_log, cmd):
 
     return output
 
-# Find files by yotube id
-def find_dlp_files(l_yotube_id,l_log):
+# Find files by youtube id
+def find_dlp_files(l_youtube_id,l_log):
     ret = {}
     status = 0
     mandatory = ['.info.json', '.description', '.mp4','.jpg']
     optional = ['.vtt', '.mp3', '.txt']
 
     for ext in mandatory + optional:
-        l_file = glob.glob('{}/*{}'.format(path_by_id(l_yotube_id),ext))
+        l_file = glob.glob('{}/*{}'.format(path_by_id(l_youtube_id),ext))
         if len(l_file) != 1:
             if ext in optional:
                 continue
-            l_log.debug('Found {} {} files for video {}. But expected one. '.format(len(l_file), ext, l_yotube_id))
+            l_log.debug('Found {} {} files for video {}. But expected one. '.format(len(l_file), ext, l_youtube_id))
             status = -1
             continue
         ret[ext] = l_file[0]
     return status,ret
 
 
-# Download yotube video
-def download_yotube_video(l_yid, l_log, l_lang = 'ru', disable_subs=False):
+# Download youtube video
+def download_youtube_video(l_yid, l_log, l_lang = 'ru', disable_subs=False):
     l_log.debug(f"Download {l_yid} {l_lang}")
     now = datetime.now()
     sub_args = f"--write-sub --sub-lang {l_lang} --write-auto-sub"
@@ -358,11 +376,11 @@ def download_yotube_video(l_yid, l_log, l_lang = 'ru', disable_subs=False):
         # Check subtitles error
         if "ERROR: Unable to download video subtitles for 'ru'" in r['stderr']:
             l_log.warning(f"Detected RU subtitles error")
-            return download_yotube_video(l_yid, l_log, l_lang = 'en')
+            return download_youtube_video(l_yid, l_log, l_lang = 'en')
 
         elif "ERROR: Unable to download video subtitles for 'en'" in r['stderr']:
             l_log.warning(f"Detected EN subtitles error")
-            return download_yotube_video(l_yid, l_log, disable_subs=True)
+            return download_youtube_video(l_yid, l_log, disable_subs=True)
 
         else:
             if os.path.exists(path_by_id(l_yid)):
@@ -423,20 +441,6 @@ def download_yotube_video(l_yid, l_log, l_lang = 'ru', disable_subs=False):
     l_log.debug(l_y_video)
     return l_y_video
 
-
-
-
-def tail_log_for_telegram(filename, n=10):
-    l_log = ''
-    with open(filename) as f:
-        for line in deque(f, n):
-            line = html.escape(line, quote=True)
-            if len(line.split(' ')) < 3 or line.split(' ')[2] == 'ERROR':
-                l_log += '<b>{}</b>'.format(line)
-            else:
-                l_log += line
-    return l_log
-
 # Seconds to days hours:minutes str
 def seconds_to_dhm(seconds):
     ret = ''
@@ -452,5 +456,13 @@ def seconds_to_dhm(seconds):
 
     ret += f'{minutes:02d}'
     seconds %= 60
-
     return ret
+
+def txt2url(txt: str):
+    return txt.replace('#', '%23')
+
+def my_serial(i: int):
+    return f"{i:07,d}".replace(",", "-")
+
+def safe_filename(name: str) -> str:
+    return re.sub(r'[^\w\-. ]+', '_', name, flags=re.UNICODE).strip()
