@@ -7,6 +7,7 @@ from pprint import pprint
 from pathlib import Path
 import time
 import config
+from weasyprint import HTML
 from my_lib import *
 from my_lib import seconds_to_dhm
 
@@ -107,13 +108,15 @@ log.debug(f'Read {len(youtube_files_name)} YouTube files name')
 
 # Get uploaded files
 with conn.cursor(dictionary=True) as cursor:
-    cursor.execute("SELECT id,oyid,status FROM `videos` WHERE place = 'old.openyogaclass.com' and channel = ?",
-                   (channel,))
+    cursor.execute("SELECT v.id,v.oyid,o.serial, v.status FROM `videos` v "
+                   "LEFT JOIN oyids o "
+                   "ON v.oyid=o.oyid "
+                   "WHERE v.place = 'old.openyogaclass.com' and v.channel = ?",(channel,))
     upload_files_name = cursor.fetchall()
 
 video_in_db={}
 for i in upload_files_name:
-    video_in_db[i['id']]={'oyid': i['oyid'], 'status': i['status']}
+    video_in_db[i['id']]={'oyid': i['oyid'], 'status': i['status'],'serial': i['serial']}
 log.debug(f'Found {len(video_in_db)} video in db')
 # pprint(video_in_db)
 
@@ -302,14 +305,16 @@ today = now.strftime("%Y%m%d")
 count=0
 
 html = ('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">'
-        '<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8"></HEAD><body>')
+        '<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8"></HEAD><body>'
+        f'<p>Updated: {datetime.today().strftime("%Y-%m-%d %H:%M")}')
 
 for pfile in files_on_disk:
     count += 1
     rel_dir = str(pfile.parent.relative_to(prefix))
     rel_path = str(pfile.relative_to(prefix))
     file_name = pfile.name
-    html += f'<p>{today}-{count:04d}<br>'
+    sr=f'{video_in_db[rel_path]["serial"]:07,d}'.replace(",","-")
+    html += f'<p>{sr}<br>'
     html += f'<b>{rel_dir}/{file_name}</b><br>'
     html += f'<a target="_blank" href="https://old.openyogaclass.com/{rel_path}">old.openyogaclass.com/{rel_path}</a><br>'
     html += f'<a target="_blank" href="https://archive.org/details/{video_in_db[rel_path]["oyid"]}">archive.org/details/{video_in_db[rel_path]["oyid"]}</a> '
@@ -324,7 +329,11 @@ for pfile in files_on_disk:
     html+=f'</p>\n'
 html+='</body></html>'
 
+log.info(f'Writing {config.log_dir}/disk-files.html')
 with open(f'{config.log_dir}/disk-files.html', 'w', newline='', encoding='utf-8') as file:
     file.write(html)
+
+log.info(f'Writing {config.log_dir}/disk-files.pdf')
+HTML(string=html).write_pdf(f'{config.log_dir}/disk-files.pdf')
 
 

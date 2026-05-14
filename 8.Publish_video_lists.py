@@ -8,7 +8,9 @@ item_name = 'OpenYoga_lists'
 
 files_to_upload = [f'{config.log_dir}/youtube-videos.html',
                    f'{config.log_dir}/youtube-videos.pdf',
-                   f'{config.log_dir}/youtube-videos.csv'
+                   f'{config.log_dir}/youtube-videos.csv',
+                   f'{config.log_dir}/disk-files.html',
+                   f'{config.log_dir}/disk-files.pdf',
                    ]
 
 # Set md
