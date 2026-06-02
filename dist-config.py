@@ -10,7 +10,7 @@ mariadb_connect = {
 }
 
 #yt_dlp = 'yt-dlp --cookies ~/tmp/cookies.txt  --proxy="socks5://127.0.0.1:8888"'
-yt_dlp = 'yt-dlp --cookies-from-browser chrome  --proxy="socks5://127.0.0.1:8888"'
+yt_dlp = 'yt-dlp --cookies-from-browser chrome+basictext --proxy="socks5://127.0.0.1:8888"'
 
 channel_id = 'UCR0-7hO2RMofHzerE8GcnxQ' # @OpenYoga108
 
